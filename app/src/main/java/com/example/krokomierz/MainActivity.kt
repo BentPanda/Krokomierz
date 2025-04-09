@@ -12,16 +12,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.krokomierz.ui.theme.KrokomierzTheme
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
@@ -56,9 +58,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         startActivity(Intent(this, HistoryActivity::class.java))
                     },
                     onSaveSteps = {
-                        val editor = prefs.edit()
-                        editor.putInt(KEY_STEPS, currentSteps.value)
-                        editor.apply()
+                        prefs.edit().putInt(KEY_STEPS, currentSteps.value).apply()
                     }
                 )
             }
@@ -79,18 +79,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
-            val totalStepsFromSensor = event.values[0]
+            val total = event.values[0]
             if (!isInitialSet) {
-                initialSteps = totalStepsFromSensor
+                initialSteps = total
                 isInitialSet = true
             }
-            val newSteps = totalStepsFromSensor - initialSteps
-            currentSteps.value = newSteps.toInt()
+            currentSteps.value = (total - initialSteps).toInt()
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun checkActivityRecognitionPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
@@ -111,31 +109,69 @@ fun MainScreen(
     onGoToHistory: () -> Unit,
     onSaveSteps: () -> Unit
 ) {
-    val context = LocalContext.current
+    var goalInput by remember { mutableStateOf("") }
+    var dailyGoal by remember { mutableStateOf(0) }
+
+    val progress = if (dailyGoal > 0) stepCount.toFloat() / dailyGoal.toFloat() else 0f
+    val progressPercent = (progress * 100).coerceAtMost(100f)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Kroki: $stepCount", modifier = Modifier.padding(8.dp))
+        Text("Kroki: $stepCount", modifier = Modifier.padding(bottom = 8.dp))
+
+        val distance = stepCount * 0.75
+        val calories = stepCount * 0.04
+
+        Text("Dystans: %.2f m".format(distance))
+        Text("Kalorie: %.2f kcal".format(calories))
         Spacer(modifier = Modifier.height(16.dp))
 
-        val distance = stepCount * 0.75 // 0.75m na krok (przykład)
-        val calories = stepCount * 0.04 // 0.04 kcal na krok (przykład)
-        Text(text = "Dystans: %.2f m".format(distance))
-        Text(text = "Kalorie: %.2f kcal".format(calories))
-        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = goalInput,
+            onValueChange = { goalInput = it },
+            label = { Text("Cel kroków (np. 5000)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
 
-        Button(onClick = onSaveSteps) {
-            Text(text = "Zapisz stan")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(onClick = {
+            dailyGoal = goalInput.toIntOrNull() ?: 0
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text("Ustaw cel")
         }
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = onGoToHistory) {
-            Text(text = "Pokaż historię")
+        if (dailyGoal > 0) {
+            LinearProgressIndicator(
+                progress = progress.coerceIn(0f, 1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Postęp: ${progressPercent.roundToInt()} %")
+        } else {
+            Text("Nie ustawiono celu")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = onSaveSteps, modifier = Modifier.fillMaxWidth()) {
+            Text("Zapisz stan")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(onClick = onGoToHistory, modifier = Modifier.fillMaxWidth()) {
+            Text("Pokaż historię")
         }
     }
 }
