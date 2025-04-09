@@ -19,17 +19,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.krokomierz.ui.theme.KrokomierzTheme
 import kotlin.math.roundToInt
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
@@ -41,8 +36,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     private var currentSteps = mutableIntStateOf(0)
 
-    private val PrefsName = "KrokomierzPrefs"
-    private val KeySteps = "KeySteps"
+    private val prefsName = "KrokomierzPrefs"
+    private val keySteps = "KeySteps"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,8 +47,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
-        val prefs = getSharedPreferences(PrefsName, Context.MODE_PRIVATE)
-        val savedSteps = prefs.getInt(KeySteps, 0)
+        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+        val savedSteps = prefs.getInt(keySteps, 0)
         currentSteps.intValue = savedSteps
 
         setContent {
@@ -64,7 +59,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         startActivity(Intent(this, HistoryActivity::class.java))
                     },
                     onSaveSteps = {
-                        prefs.edit().putInt(KeySteps, currentSteps.intValue).apply()
+                        prefs.edit().putInt(keySteps, currentSteps.intValue).apply()
                     }
                 )
             }
@@ -113,6 +108,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     stepCount: Int,
@@ -140,8 +136,7 @@ fun MainScreen(
         Text("Dystans: %.2f m".format(distance))
         Text("Kalorie: %.2f kcal".format(calories))
         Spacer(modifier = Modifier.height(16.dp))
-        @OptIn(ExperimentalMaterial3Api::class)
-        @Composable
+
         OutlinedTextField(
             value = goalInput,
             onValueChange = { goalInput = it },
