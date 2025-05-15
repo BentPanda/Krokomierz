@@ -4,7 +4,6 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.krokomierz">
 
-    <!-- Uprawnienie do rozpoznawania aktywności/kroków (Android 10+) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
 
     <application
@@ -19,21 +18,24 @@
         tools:targetApi="31">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".MenuActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Krokomierz">
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- PRZYKŁAD: dodatkowa aktywność (jeśli używasz) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Krokomierz" />
+
         <activity
             android:name=".HistoryActivity"
-            android:exported="true" />
+            android:exported="false"
+            android:theme="@style/Theme.Krokomierz" />
 
     </application>
 </manifest>

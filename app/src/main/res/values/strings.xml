@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Krokomierz</string>
+    <string name="menu_main">Rozpocznij pomiar</string>
+    <string name="menu_history">Historia pomiarów</string>
 </resources>
