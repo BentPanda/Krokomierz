@@ -1,6 +1,9 @@
 package com.example.krokomierz
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,13 +14,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.krokomierz.ui.theme.BottomNavBar
 import com.example.krokomierz.ui.theme.KrokomierzTheme
+import com.example.krokomierz.ui.theme.NavItem
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
-import android.content.SharedPreferences
-
 
 class HistoryActivity : ComponentActivity() {
 
@@ -27,12 +31,34 @@ class HistoryActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        overridePendingTransition(0, 0)
 
         setContent {
-            KrokomierzTheme {
-                HistoryScreen()
-            }
+            KrokomierzTheme { HistoryScaffold { HistoryScreen() } }
         }
+    }
+
+
+    @Composable
+    private fun HistoryScaffold(content: @Composable () -> Unit) {
+        val ctx = LocalContext.current
+
+        Scaffold(
+            bottomBar = {
+                BottomNavBar(
+                    selected = NavItem.HISTORIA,
+                    onKrokomierzClick = {
+                        ctx.startActivity(Intent(ctx, MainActivity::class.java))
+                        (ctx as Activity).overridePendingTransition(0, 0)
+                    },
+                    onHistoriaClick = {},
+                    onProfilClick = {
+                        ctx.startActivity(Intent(ctx, ProfileActivity::class.java))
+                        (ctx as Activity).overridePendingTransition(0, 0)
+                    }
+                )
+            }
+        ) { paddingValues -> Box(Modifier.padding(paddingValues)) { content() } }
     }
 
     @Composable
@@ -41,9 +67,7 @@ class HistoryActivity : ComponentActivity() {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val currentSteps = prefs.getInt(KEY_CURRENT_STEPS, 0)
 
-        var historyMap by remember {
-            mutableStateOf(loadHistory(prefs))
-        }
+        var historyMap by remember { mutableStateOf(loadHistory(prefs)) }
 
         Column(
             modifier = Modifier
@@ -52,7 +76,7 @@ class HistoryActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = "Dzisiaj: $currentSteps kroków", style = MaterialTheme.typography.titleMedium)
+            Text("Dzisiaj: $currentSteps kroków", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(onClick = {
@@ -65,7 +89,7 @@ class HistoryActivity : ComponentActivity() {
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text(text = "Historia dni:", style = MaterialTheme.typography.titleMedium)
+            Text("Historia dni:", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -78,9 +102,7 @@ class HistoryActivity : ComponentActivity() {
 
     private fun saveHistory(prefs: SharedPreferences, history: Map<String, Int>) {
         val json = JSONObject()
-        for ((date, steps) in history) {
-            json.put(date, steps)
-        }
+        for ((date, steps) in history) json.put(date, steps)
         prefs.edit().putString(KEY_HISTORY, json.toString()).apply()
     }
 

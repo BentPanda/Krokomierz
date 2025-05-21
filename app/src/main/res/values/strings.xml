@@ -2,4 +2,9 @@
     <string name="app_name">Krokomierz</string>
     <string name="menu_main">Rozpocznij pomiar</string>
     <string name="menu_history">Historia pomiarów</string>
+    <string name="nav_menu">Menu</string>
+    <string name="nav_steps">Kroki</string>
+    <string name="nav_history">Historia</string>
+    <string name="title_krokomierz">Krokomierz!</string>
+
 </resources>

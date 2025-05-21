@@ -1,6 +1,7 @@
 package com.example.krokomierz
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,11 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.krokomierz.ui.theme.BottomNavBar
 import com.example.krokomierz.ui.theme.KrokomierzTheme
+import com.example.krokomierz.ui.theme.NavItem
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity(), SensorEventListener {
@@ -41,6 +45,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        overridePendingTransition(0, 0)
 
         checkActivityRecognitionPermission()
 
@@ -48,16 +53,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
         val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        val savedSteps = prefs.getInt(keySteps, 0)
-        currentSteps.intValue = savedSteps
+        currentSteps.intValue = prefs.getInt(keySteps, 0)
 
         setContent {
             KrokomierzTheme {
-                MainScreen(
+                MainScaffold(
                     stepCount = currentSteps.intValue,
-                    onGoToHistory = {
-                        startActivity(Intent(this, HistoryActivity::class.java))
-                    },
                     onSaveSteps = {
                         prefs.edit().putInt(keySteps, currentSteps.intValue).apply()
                     }
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             }
         }
     }
+
 
     override fun onResume() {
         super.onResume()
@@ -108,13 +110,39 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
-fun MainScreen(
+private fun MainScaffold(
     stepCount: Int,
-    onGoToHistory: () -> Unit,
     onSaveSteps: () -> Unit
 ) {
+    val ctx = LocalContext.current
+
+    Scaffold(
+        bottomBar = {
+            BottomNavBar(
+                selected = NavItem.KROKI,
+                onKrokomierzClick = {},
+                onHistoriaClick = {
+                    ctx.startActivity(Intent(ctx, HistoryActivity::class.java))
+                    (ctx as Activity).overridePendingTransition(0, 0)
+                },
+                onProfilClick = {
+                    ctx.startActivity(Intent(ctx, ProfileActivity::class.java))
+                    (ctx as Activity).overridePendingTransition(0, 0)
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(Modifier.padding(paddingValues)) {
+            MainScreen(stepCount = stepCount, onSaveSteps = onSaveSteps)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen(stepCount: Int, onSaveSteps: () -> Unit) {
     var goalInput by remember { mutableStateOf("") }
     var dailyGoal by remember { mutableIntStateOf(0) }
 
@@ -152,9 +180,7 @@ fun MainScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = {
-                dailyGoal = goalInput.toIntOrNull() ?: 0
-            },
+            onClick = { dailyGoal = goalInput.toIntOrNull() ?: 0 },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Ustaw cel")
@@ -179,12 +205,6 @@ fun MainScreen(
 
         Button(onClick = onSaveSteps, modifier = Modifier.fillMaxWidth()) {
             Text("Zapisz stan")
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Button(onClick = onGoToHistory, modifier = Modifier.fillMaxWidth()) {
-            Text("Pokaż historię")
         }
     }
 }
