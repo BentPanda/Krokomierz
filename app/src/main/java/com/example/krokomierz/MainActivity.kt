@@ -15,6 +15,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,11 +26,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.krokomierz.ui.theme.BottomNavBar
-import com.example.krokomierz.ui.theme.KrokomierzTheme
-import com.example.krokomierz.ui.theme.NavItem
+import com.example.krokomierz.ui.theme.*
 import com.example.krokomierz.util.PrefKeys
-import kotlin.math.roundToInt
+import com.example.krokomierz.util.ThemeController
 import kotlin.math.roundToLong
 
 class MainActivity : ComponentActivity(), SensorEventListener {
@@ -38,16 +37,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var stepSensor: Sensor? = null
 
     private lateinit var prefs: SharedPreferences
-
     private var currentSteps  = mutableIntStateOf(0)
     private var dailyGoal     = mutableIntStateOf(0)
     private var counterOffset = Float.NaN
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
 
-        requestActivityRecognition()
+        ThemeController.load(this)
+        askActivityRecognition()
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepSensor    = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
@@ -58,10 +58,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         counterOffset         = prefs.getFloat(PrefKeys.OFFSET_FLOAT, Float.NaN)
 
         setContent {
-            KrokomierzTheme {
+            KrokomierzTheme(darkTheme = ThemeController.isDark.value) {
                 MainScaffold(
-                    stepCount    = currentSteps.intValue,
-                    dailyGoal    = dailyGoal.intValue,
+                    steps       = currentSteps.intValue,
+                    dailyGoal   = dailyGoal.intValue,
                     onGoalChange = ::updateDailyGoal
                 )
             }
@@ -70,16 +70,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
-        stepSensor?.also { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
+        stepSensor?.also {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
     }
     override fun onPause() {
         super.onPause(); sensorManager.unregisterListener(this)
     }
 
+
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
-
         val total = event.values[0]
+
         if (counterOffset.isNaN()) {
             counterOffset = total - currentSteps.intValue
             prefs.edit().putFloat(PrefKeys.OFFSET_FLOAT, counterOffset).apply()
@@ -90,11 +93,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
-    private fun updateDailyGoal(g: Int) {
-        dailyGoal.intValue = g
-        prefs.edit().putInt(PrefKeys.DAILY_GOAL, g).apply()
+    private fun updateDailyGoal(goal: Int) {
+        dailyGoal.intValue = goal
+        prefs.edit().putInt(PrefKeys.DAILY_GOAL, goal).apply()
     }
-    private fun requestActivityRecognition() {
+    private fun askActivityRecognition() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(
                 this, Manifest.permission.ACTIVITY_RECOGNITION
@@ -111,7 +114,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
 @Composable
 private fun MainScaffold(
-    stepCount: Int,
+    steps: Int,
     dailyGoal: Int,
     onGoalChange: (Int) -> Unit
 ) {
@@ -120,7 +123,7 @@ private fun MainScaffold(
         bottomBar = {
             BottomNavBar(
                 selected = NavItem.KROKI,
-                onKrokomierzClick = {},
+                onKrokomierzClick = { },
                 onHistoriaClick = {
                     ctx.startActivity(
                         Intent(ctx, HistoryActivity::class.java)
@@ -138,20 +141,35 @@ private fun MainScaffold(
             )
         }
     ) { padding -> Box(Modifier.padding(padding)) {
-        MainScreen(stepCount, dailyGoal, onGoalChange)
-    }
-    }
+        MainScreen(steps, dailyGoal, onGoalChange)
+    }}
 }
 
 @Composable
+private fun SectionCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        shape  = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor =
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.06f)
+        )
+    ) { Column(Modifier.padding(20.dp), content = content) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun MainScreen(
-    stepCount: Int,
+    steps: Int,
     dailyGoal: Int,
     onGoalChange: (Int) -> Unit
 ) {
     var goalInput by remember { mutableStateOf(if (dailyGoal > 0) dailyGoal.toString() else "") }
-    val progress        = if (dailyGoal > 0) stepCount.toFloat() / dailyGoal else 0f
-    val progressPercent = (progress * 100).coerceAtMost(100f)
 
     Column(
         modifier = Modifier
@@ -159,34 +177,37 @@ fun MainScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Kroki: $stepCount", modifier = Modifier.padding(bottom = 8.dp))
-        Text("Dystans: %.2f m".format(stepCount * 0.75))
-        Text("Kalorie: %.2f kcal".format(stepCount * 0.04))
-        Spacer(Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = goalInput,
-            onValueChange = { goalInput = it },
-            label = { Text("Cel kroków") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = { onGoalChange(goalInput.toIntOrNull() ?: 0) },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Ustaw cel") }
-
-        Spacer(Modifier.height(16.dp))
-        if (dailyGoal > 0) {
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
+        SectionCard {
+            OutlinedTextField(
+                value = goalInput,
+                onValueChange = { goalInput = it },
+                label = { Text("Cel kroków") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
-            Text("Postęp: ${progressPercent.roundToInt()} %")
-        } else Text("Nie ustawiono celu")
+            Button(
+                onClick = { onGoalChange(goalInput.toIntOrNull() ?: 0) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Ustaw cel") }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        SectionCard {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                StepRingProgress(steps = steps, goal = dailyGoal)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        SectionCard {
+            Text("Kalorie: %.2f kcal".format(steps * 0.04))
+        }
     }
 }

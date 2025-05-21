@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +21,7 @@ import com.example.krokomierz.ui.theme.BottomNavBar
 import com.example.krokomierz.ui.theme.KrokomierzTheme
 import com.example.krokomierz.ui.theme.NavItem
 import com.example.krokomierz.util.PrefKeys
+import com.example.krokomierz.util.ThemeController
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
@@ -28,18 +30,20 @@ class HistoryActivity : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
     private lateinit var currentStepsState: MutableIntState
-    private lateinit var historyMapState: MutableState<Map<String, Int>>
+    private var historyMapState = mutableStateOf<Map<String, Int>>(emptyMap())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
 
-        prefs              = getSharedPreferences(PrefKeys.FILE, Context.MODE_PRIVATE)
-        currentStepsState  = mutableIntStateOf(prefs.getInt(PrefKeys.STEPS, 0))
-        historyMapState    = mutableStateOf(loadHistory(prefs))
+        ThemeController.load(this)
+
+        prefs = getSharedPreferences(PrefKeys.FILE, Context.MODE_PRIVATE)
+        currentStepsState = mutableIntStateOf(prefs.getInt(PrefKeys.STEPS, 0))
+        historyMapState.value = loadHistory(prefs)
 
         setContent {
-            KrokomierzTheme {
+            KrokomierzTheme(darkTheme = ThemeController.isDark.value) {
                 HistoryScaffold {
                     HistoryScreen(
                         todaySteps = currentStepsState.intValue,
@@ -53,10 +57,8 @@ class HistoryActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        val freshSteps = prefs.getInt(PrefKeys.STEPS, 0)
-        currentStepsState.intValue = freshSteps
+        currentStepsState.intValue = prefs.getInt(PrefKeys.STEPS, 0)
     }
-
 
     @Composable
     private fun HistoryScaffold(content: @Composable () -> Unit) {
@@ -72,7 +74,7 @@ class HistoryActivity : ComponentActivity() {
                         )
                         (ctx as Activity).overridePendingTransition(0, 0)
                     },
-                    onHistoriaClick = { /* już tu jesteśmy */ },
+                    onHistoriaClick = { },
                     onProfilClick = {
                         ctx.startActivity(
                             Intent(ctx, ProfileActivity::class.java)
@@ -86,60 +88,68 @@ class HistoryActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            shape  = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.06f)
+            )
+        ) { Column(Modifier.padding(20.dp), content = content) }
+    }
+
+    @Composable
     private fun HistoryScreen(
         todaySteps: Int,
         historyMap: Map<String, Int>,
         onSaveToday: () -> Unit
     ) {
-        val today = remember {
-            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Dzisiaj: $todaySteps kroków",
-                style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-
-            Button(onClick = onSaveToday) {
-                Text("Zapisz dzisiejsze kroki")
+            SectionCard {
+                Text("Dzisiaj: $todaySteps kroków",
+                    style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = onSaveToday) { Text("Zapisz dzisiejsze kroki") }
             }
 
-            Spacer(Modifier.height(24.dp))
-            Text("Historia dni:", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(historyMap.toSortedMap(reverseOrder()).entries.toList()) { entry ->
-                    Text("${entry.key} – ${entry.value} kroków",
-                        modifier = Modifier.padding(4.dp))
+            SectionCard {
+                Text("Historia dni:", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                if (historyMap.isEmpty()) {
+                    Text("Brak zapisów")
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(historyMap.toSortedMap(reverseOrder()).entries.toList()) { entry ->
+                            Text("${entry.key} – ${entry.value} kroków",
+                                modifier = Modifier.padding(vertical = 4.dp))
+                        }
+                    }
                 }
             }
         }
     }
-
-    /* -------------------  zapis/odczyt historii  ------------------------- */
-
+    
     private fun saveTodayToHistory() {
-        val today   = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val steps   = currentStepsState.intValue
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val steps = currentStepsState.intValue
         val updated = historyMapState.value.toMutableMap().apply { this[today] = steps }
         historyMapState.value = updated
         saveHistory(prefs, updated)
     }
-
     private fun saveHistory(prefs: SharedPreferences, history: Map<String, Int>) {
         val json = JSONObject().apply { history.forEach { put(it.key, it.value) } }
         prefs.edit().putString(PrefKeys.HISTORY_JSON, json.toString()).apply()
     }
-
     private fun loadHistory(prefs: SharedPreferences): Map<String, Int> {
         val jsonString = prefs.getString(PrefKeys.HISTORY_JSON, "{}") ?: "{}"
-        val obj        = JSONObject(jsonString)
+        val obj = JSONObject(jsonString)
         return buildMap {
             val keys = obj.keys()
             while (keys.hasNext()) {
