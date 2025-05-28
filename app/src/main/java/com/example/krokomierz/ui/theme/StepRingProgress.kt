@@ -16,14 +16,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
-/**
- * Okrągły pasek postępu z liczbą kroków w środku.
- *
- * @param steps  aktualna liczba kroków
- * @param goal   cel kroków (jeśli 0 – ring pokazuje jedynie tło)
- * @param ringSizeDp średnica okręgu
- * @param strokeWidth szerokość obrysu
- */
 @Composable
 fun StepRingProgress(
     steps: Int,
@@ -56,7 +48,6 @@ fun StepRingProgress(
                 )
                 val arcSize = Size(diameter - strokePx, diameter - strokePx)
 
-                // tło
                 drawArc(
                     color = bgColor,
                     startAngle = -90f,
@@ -66,7 +57,6 @@ fun StepRingProgress(
                     size = arcSize,
                     style = Stroke(width = strokePx, cap = StrokeCap.Round)
                 )
-                // postęp
                 drawArc(
                     color = fgColor,
                     startAngle = -90f,
