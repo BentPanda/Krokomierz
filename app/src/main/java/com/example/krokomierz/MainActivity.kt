@@ -162,7 +162,6 @@ private fun SectionCard(
     ) { Column(Modifier.padding(20.dp), content = content) }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     steps: Int,

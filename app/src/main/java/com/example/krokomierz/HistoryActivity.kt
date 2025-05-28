@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
+import android.widget.CalendarView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -15,11 +17,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.krokomierz.ui.theme.BottomNavBar
-import com.example.krokomierz.ui.theme.KrokomierzTheme
-import com.example.krokomierz.ui.theme.NavItem
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.krokomierz.ui.theme.*
 import com.example.krokomierz.util.PrefKeys
 import com.example.krokomierz.util.ThemeController
 import org.json.JSONObject
@@ -43,12 +45,17 @@ class HistoryActivity : ComponentActivity() {
         historyMapState.value = loadHistory(prefs)
 
         setContent {
-            KrokomierzTheme(darkTheme = ThemeController.isDark.value) {
+            val darkMode by ThemeController.isDark
+            val accent   by ThemeController.accentColor
+
+            KrokomierzTheme(darkTheme = darkMode) {
                 HistoryScaffold {
                     HistoryScreen(
                         todaySteps = currentStepsState.intValue,
                         historyMap = historyMapState.value,
-                        onSaveToday = ::saveTodayToHistory
+                        onSaveToday = ::saveTodayToHistory,
+                        darkMode    = darkMode,
+                        accentColor = accent
                     )
                 }
             }
@@ -84,28 +91,25 @@ class HistoryActivity : ComponentActivity() {
                     }
                 )
             }
-        ) { padding -> Box(Modifier.padding(padding)) { content() } }
-    }
-
-    @Composable
-    private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            shape  = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.06f)
-            )
-        ) { Column(Modifier.padding(20.dp), content = content) }
+        ) { padding ->
+            Box(Modifier.padding(padding)) { content() }
+        }
     }
 
     @Composable
     private fun HistoryScreen(
         todaySteps: Int,
         historyMap: Map<String, Int>,
-        onSaveToday: () -> Unit
+        onSaveToday: () -> Unit,
+        darkMode: Boolean,
+        accentColor: androidx.compose.ui.graphics.Color
     ) {
+        var selectedDate by remember { mutableStateOf("") }
+        val selectedSteps = historyMap[selectedDate] ?: 0
+
+        val textColor    = MaterialTheme.colorScheme.onSurface.toArgb()
+        val highlightClr = accentColor.toArgb()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -118,6 +122,48 @@ class HistoryActivity : ComponentActivity() {
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = onSaveToday) { Text("Zapisz dzisiejsze kroki") }
             }
+
+            Spacer(Modifier.height(16.dp))
+
+            SectionCard {
+                Text("Wybierz datę", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+
+                AndroidView(
+                    factory = { ctx -> CalendarView(ctx) },
+                    update = { view ->
+                        // ustawiamy kolory zgodnie z motywem i akcentem
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            view.setFocusedMonthDateColor(textColor)
+                            view.setUnfocusedMonthDateColor(textColor)
+                            view.weekSeparatorLineColor = textColor
+                            view.setSelectedWeekBackgroundColor(highlightClr)
+                        }
+                        // listener wyboru daty
+                        view.setOnDateChangeListener { _, year, month, day ->
+                            selectedDate = "%04d-%02d-%02d".format(year, month + 1, day)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                )
+
+                Spacer(Modifier.height(12.dp))
+                if (selectedDate.isNotEmpty()) {
+                    Text(
+                        "Kroki w dniu $selectedDate: $selectedSteps",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                } else {
+                    Text(
+                        "Wybierz na kalendarzu dzień, by zobaczyć kroki",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             SectionCard {
                 Text("Historia dni:", style = MaterialTheme.typography.titleMedium)
@@ -135,7 +181,7 @@ class HistoryActivity : ComponentActivity() {
             }
         }
     }
-    
+
     private fun saveTodayToHistory() {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val steps = currentStepsState.intValue
@@ -143,17 +189,20 @@ class HistoryActivity : ComponentActivity() {
         historyMapState.value = updated
         saveHistory(prefs, updated)
     }
+
     private fun saveHistory(prefs: SharedPreferences, history: Map<String, Int>) {
         val json = JSONObject().apply { history.forEach { put(it.key, it.value) } }
         prefs.edit().putString(PrefKeys.HISTORY_JSON, json.toString()).apply()
     }
+
     private fun loadHistory(prefs: SharedPreferences): Map<String, Int> {
         val jsonString = prefs.getString(PrefKeys.HISTORY_JSON, "{}") ?: "{}"
         val obj = JSONObject(jsonString)
         return buildMap {
             val keys = obj.keys()
             while (keys.hasNext()) {
-                val k = keys.next(); put(k, obj.optInt(k, 0))
+                val k = keys.next()
+                put(k, obj.optInt(k, 0))
             }
         }
     }

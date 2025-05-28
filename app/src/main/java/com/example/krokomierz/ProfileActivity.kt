@@ -66,7 +66,7 @@ private fun ProfileScaffold(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
